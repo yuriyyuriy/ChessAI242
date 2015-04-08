@@ -1,5 +1,7 @@
 package com.company;
 
+import com.company.Board;
+import com.company.Color;
 import com.company.PieceTypes.*;
 import junit.framework.TestCase;
 import org.junit.Test;

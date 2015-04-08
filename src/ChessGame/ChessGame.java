@@ -14,8 +14,8 @@ public class ChessGame {
     ChessPlayer Player_one;
     ChessPlayer Player_two;
     ChessGUI curGui;
-    private ChessPiece [] BlackPieces;
-    private ChessPiece [] WhitePieces;
+    public ChessPiece [] BlackPieces;
+    public ChessPiece [] WhitePieces;
     private King WhiteKing;
     private King BlackKing;
     private Board ChessBoard;
@@ -25,6 +25,10 @@ public class ChessGame {
     private boolean newGame;
     private boolean newCustom;
     private boolean stopGameLoop;
+
+    Color currentColor=Color.White; // sets first color
+    ChessPlayer curPlayer= Player_one;
+    ChessPiece currentPiece;
 
     LinkedList<int []> movesQueue = new LinkedList<int []>();
     LinkedList<Boolean> responseQueue = new LinkedList<Boolean>();
@@ -48,101 +52,116 @@ public class ChessGame {
         spacing= curGui.getSpacing();
         gameLoop();
     }
+
     private void gameLoop(){
-        Color currentColor=Color.White; // sets first color
-        ChessPlayer curPlayer= Player_one;
-        ChessPiece currentPiece;
-        ActualGameLoop:
+
         while (!checkEndGame(currentColor)) { // check endgame conditions on each loop
             validMove=false;
-            while(movesQueue.isEmpty()){
-                try {
-                    Thread.sleep(50);
-                    if (stopGameLoop){
-                        break ActualGameLoop;
-                    }
-                    if (undoTriggered){
-                        if (curPlayer.getLastMove()!=null){
-                            ChessBoard.setPieceLayout(curPlayer.getLastMove());
-                            ChessBoard.updatePieces();
-                            curGui.updatePieces(ChessBoard);
-                            Player_one.setLastMove(null);
-                            Player_two.setLastMove(null);
-                        }
-                        undoTriggered=false;
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+            if (waitForMove()) {
+                break; // waitForMove returns true on manual end game
+            }
+            tryMove();
+            responseQueue.add(validMove);
+        }
+
+        stopGameLoop=false;
+
+        if (newGame){
+            newGame=false;
+            startNewGame(true);
+        }
+        else {
+            curGui.gameOver();
+            startNewGame(true);
+        }
+
+    }
+
+    private boolean waitForMove() {
+    /* wait for new move */
+        while(movesQueue.isEmpty()){
+            try {
+                Thread.sleep(50);
+                if (stopGameLoop){
+                    return true;
                 }
-            } // busy wait
-            ChessPiece[][] curState= ChessBoard.getPieceLayout();
-            int [] curLoc= movesQueue.poll();
-            int xInitial= curLoc[0];
-            int yInitial= curLoc[1];
-            int xEnd= curLoc[2];
-            int yEnd= curLoc[3];
-            // lets assume an input is two locations x_initial, y_initial, x_end, y_end
-            currentPiece = ChessBoard.getPiece(xInitial, yInitial); // gets current piece at location
-            if (currentPiece!=null) {   // check if it exists
-                if (currentPiece.getColor() == currentColor) { // makes sure it belongs to player
-                    if (currentPiece.validMove(xEnd, yEnd)) { // checks if move is valid
-                        int oldX= currentPiece.getX();
-                        int oldY= currentPiece.getY();
-                        ChessPiece oldPiece= ChessBoard.getPiece(xEnd, yEnd);
-                        boolean successMove=ChessBoard.movePiece(currentPiece, xEnd, yEnd); // checks if move is successful
-                        if (successMove) {  // color switch assuming all else is possible
-                            if (currentColor == Color.White) {
-                                if (WhiteKing.inCheck()){
-                                    ChessBoard.movePiece(currentPiece, oldX, oldY);
-                                    if (oldPiece!=null) {
-                                        ChessBoard.movePiece(oldPiece, xEnd, yEnd);
-                                    }
+                if (undoTriggered){
+                    if (curPlayer.getLastMove()!=null){
+                        ChessBoard.setPieceLayout(curPlayer.getLastMove());
+                        ChessBoard.updatePieces();
+                        curGui.updatePieces(ChessBoard);
+                        Player_one.setLastMove(null);
+                        Player_two.setLastMove(null);
+                    }
+                    undoTriggered=false;
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        } // busy wait
+        return false;
+    }
+
+    private void makeAiMove() throws InterruptedException {
+        Thread.sleep(500);
+        int[] ai_move = null; // TODO - get AI move
+        movesQueue.add(ai_move);
+        /* TODO - ai mover returns piece and new location */
+
+    }
+
+    private void tryMove() {
+        ChessPiece[][] curState= ChessBoard.getPieceLayout();
+        int [] curLoc= movesQueue.poll();
+        int xInitial= curLoc[0];
+        int yInitial= curLoc[1];
+        int xEnd= curLoc[2];
+        int yEnd= curLoc[3];
+        // lets assume an input is two locations x_initial, y_initial, x_end, y_end
+        currentPiece = ChessBoard.getPiece(xInitial, yInitial); // gets current piece at location
+        if (currentPiece!=null) {   // check if it exists
+            if (currentPiece.getColor() == currentColor) { // makes sure it belongs to player
+                if (currentPiece.validMove(xEnd, yEnd)) { // checks if move is valid
+                    int oldX= currentPiece.getX();
+                    int oldY= currentPiece.getY();
+                    ChessPiece oldPiece= ChessBoard.getPiece(xEnd, yEnd);
+                    boolean successMove=ChessBoard.movePiece(currentPiece, xEnd, yEnd); // checks if move is successful
+                    if (successMove) {  // color switch assuming all else is possible
+                        if (currentColor == Color.White) {
+                            if (WhiteKing.inCheck()){
+                                ChessBoard.movePiece(currentPiece, oldX, oldY);
+                                if (oldPiece!=null) {
+                                    ChessBoard.movePiece(oldPiece, xEnd, yEnd);
                                 }
-                                else
-                                {
-                                    validMove=true;
-                                    curPlayer.setLastMove(curState);
-                                    currentColor = Color.Black;
-                                    curPlayer= Player_two;
+                            }
+                            else
+                            {
+                                validMove=true;
+                                curPlayer.setLastMove(curState);
+                                currentColor = Color.Black;
+                                curPlayer= Player_two;
+                            }
+                        } else {
+                            if (BlackKing.inCheck()){
+                                ChessBoard.movePiece(currentPiece, oldX, oldY);
+                                if (oldPiece!=null) {
+                                    ChessBoard.movePiece(oldPiece, xEnd, yEnd);
                                 }
-                            } else {
-                                if (BlackKing.inCheck()){
-                                    ChessBoard.movePiece(currentPiece, oldX, oldY);
-                                    if (oldPiece!=null) {
-                                        ChessBoard.movePiece(oldPiece, xEnd, yEnd);
-                                    }
-                                }
-                                else
-                                {
-                                    validMove=true;
-                                    curPlayer.setLastMove(curState);
-                                    currentColor = Color.White;
-                                    curPlayer= Player_one;
-                                }
+                            }
+                            else
+                            {
+                                validMove=true;
+                                curPlayer.setLastMove(curState);
+                                currentColor = Color.White;
+                                curPlayer= Player_one;
                             }
                         }
                     }
                 }
             }
-            responseQueue.add(validMove);
-        }
-        if (newGame){
-            stopGameLoop=false;
-            newGame=false;
-            startNewGame(true);
-        }
-        if (newCustom){
-            stopGameLoop=false;
-            newCustom=false;
-            startNewCustom();
-        }
-        else {
-            curGui.gameOver();
-            stopGameLoop=false;
-            newGame=false;
-            startNewGame(true);
         }
     }
+
     public void setUpStandardPieces(){ // basic configuration for a standard chessgame
         BlackPieces[0]= new King(ChessBoard,Color.Black,3,0);
         ChessBoard.setPieceLocation(BlackPieces[0],3,0);

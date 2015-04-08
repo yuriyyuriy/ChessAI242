@@ -25,4 +25,7 @@ public class ChessPlayer {
     public ChessPiece[][] getLastMove(){
         return lastMove;
     }
+    public Color getColor() {
+        return curColor;
+    }
 }
